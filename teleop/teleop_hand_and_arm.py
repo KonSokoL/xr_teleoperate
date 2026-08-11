@@ -186,6 +186,7 @@ if __name__ == '__main__':
             arm_ctrl = R1_A7_ArmController(motion_mode=args.motion, simulation_mode=args.sim)
 
         # end-effector
+        # TODO: Make end-effectors (hands) work with controllers
         if args.ee in ("dex3", "inspire_ftp", "inspire_dfx") and args.input_mode == "controller":
             raise ValueError(f"{args.ee} does not support controller input mode.")
         elif args.ee == "dex3":
