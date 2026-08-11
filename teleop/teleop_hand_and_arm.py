@@ -187,6 +187,9 @@ if __name__ == '__main__':
 
         # end-effector
         # TODO: Make end-effectors (hands) work with controllers
+
+        # This condition makes program to stop working with Unitree Dex3-1, Inspire FTP/DFX hands
+        # To make hands work with controller it's needed to look how Dex1-1 works
         if args.ee in ("dex3", "inspire_ftp", "inspire_dfx") and args.input_mode == "controller":
             raise ValueError(f"{args.ee} does not support controller input mode.")
         elif args.ee == "dex3":
@@ -198,6 +201,8 @@ if __name__ == '__main__':
             dual_hand_action_array = Array('d', 14, lock = False)  # [output] current left, right hand action(14) data.
             hand_ctrl = Dex3_1_Controller(left_hand_pos_array, right_hand_pos_array, dual_hand_data_lock, 
                                           dual_hand_state_array, dual_hand_action_array, simulation_mode=args.sim, xr_motion_data_ready_in=xr_motion_data_ready)
+
+        # Here is Dex1-1 activation algorithm
         elif args.ee == "dex1":
             from teleop.robot_control.robot_hand_unitree import Dex1_1_Gripper_Controller
             left_gripper_value = Value('d', 0.0, lock=True)        # [input]
