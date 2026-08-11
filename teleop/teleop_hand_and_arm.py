@@ -189,7 +189,7 @@ if __name__ == '__main__':
         # TODO: Make end-effectors (hands) work with controllers
 
         # This condition makes program to stop working with Unitree Dex3-1, Inspire FTP/DFX hands
-        # To make hands work with controller it's needed to look how Dex1-1 works
+        # To make Dex3-1 hands work with controller it's needed to look how Dex1-1 works
         if args.ee in ("dex3", "inspire_ftp", "inspire_dfx") and args.input_mode == "controller":
             raise ValueError(f"{args.ee} does not support controller input mode.")
         elif args.ee == "dex3":
@@ -321,6 +321,8 @@ if __name__ == '__main__':
 
             # get xr's tele data
             tele_data = tv_wrapper.get_tele_data()
+            # Heres's control of Dex and Inspire end-effectors using hands, but it can't work controllers
+            # Let's fix it!
             if args.ee in ("dex3", "inspire_ftp", "inspire_dfx", "brainco")  and args.input_mode == "hand":
                 with left_hand_pos_array.get_lock():
                     left_hand_pos_array[:] = tele_data.left_hand_pos.flatten()
@@ -335,6 +337,7 @@ if __name__ == '__main__':
                     right_gripper_trigger_in.value = tele_data.right_ctrl_triggerValue
                 with right_gripper_squeeze_in.get_lock():
                     right_gripper_squeeze_in.value = tele_data.right_ctrl_squeezeValue
+            # Here's an example of Dex1-1 work with controllers
             elif args.ee in ("dex1", "dex1_internal") and args.input_mode == "controller":
                 with left_gripper_value.get_lock():
                     left_gripper_value.value = tele_data.left_ctrl_triggerValue
