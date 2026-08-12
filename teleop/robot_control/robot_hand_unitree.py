@@ -379,26 +379,27 @@ class Dex3_1_Controller_ctrl:
                 # Read left and right q_state from shared arrays
                 state_data = np.concatenate((np.array(left_hand_state_array[:]), np.array(right_hand_state_array[:])))
 
-                # TODO: change calculation of target finger positions
                 if xr_motion_data_ready:
                     # In the official document, the angles are in the range [0, 1] ==> 0.0: fully open  1.0: fully closed
                     left_triger_value = (10.0 - left_trigger_value) / 10.0
-                    left_q_target[0] = np.clip((left_triger_value - 0.5) / 0.5, a_min=0.0, a_max=0.98) # thumb-aux
-                    left_q_target[1] = np.clip(left_triger_value / 0.5, 0.0, 0.7) # thumb
-                    left_q_target[2] = np.clip(left_triger_value, 0.0, 0.98)                   # index
-                    left_q_target[3] = np.clip(left_squeeze_value, 0.0, 0.98)   # middle
-                    left_q_target[4] = np.clip(left_squeeze_value, 0.0, 0.98)   # ring
-                    left_q_target[5] = np.clip(left_triger_value, 0.0, 0.98)   # pinky
-                    left_q_target[6] = np.clip(left_triger_value, 0.0, 0.98)
+                    # Thumb0 setted to zero to center finger
+                    left_q_target[0] = 0 # np.clip((left_trigger_value - 0.5) / 0.5, 0.0, 0.98) # thumb0 ()
+                    left_q_target[1] = np.clip(left_triger_value, 0.0, 1.0) # thumb1 (-0.61rad(full open) to 1.04rad(full close))
+                    left_q_target[2] = np.clip(left_triger_value, 0.0, 1.7) # thumb2 (0rad(full open) to 1.74rad(full close))
+                    left_q_target[3] = np.clip(-left_squeeze_value, -0.98, 0.0) # middle0 (pinky0)
+                    left_q_target[4] = np.clip(-left_squeeze_value, -0.98, 0.0) # middle1 (pinky1)
+                    left_q_target[5] = np.clip(-left_triger_value, -0.98, 0.0) # index0 (point0)
+                    left_q_target[6] = np.clip(-left_triger_value, -0.98, 0.0) # index1 (point1)
 
                     right_triger_value = (10.0 - right_trigger_value) / 10.0
-                    right_q_target[0] = np.clip((right_triger_value - 0.5) / 0.5, 0.0, 0.98)
-                    right_q_target[1] = np.clip(right_triger_value / 0.5, 0.0, 0.7)
-                    right_q_target[2] = np.clip(right_squeeze_value, 0.0, 0.98)                  # index
-                    right_q_target[3] = np.clip(right_triger_value, 0.0, 0.98)  # middle
-                    right_q_target[4] = np.clip(right_triger_value, 0.0, 0.98)  # ring
-                    right_q_target[5] = np.clip(right_squeeze_value, 0.0, 0.98)  # pinky
-                    right_q_target[6] = np.clip(right_squeeze_value, 0.0, 0.98)
+                    # Thumb0 setted to zero to center finger
+                    right_q_target[0] = 0 # np.clip((right_triger_value - 0.5) / 0.5, 0.0, 0.98) # thumb0
+                    right_q_target[1] = np.clip(-right_triger_value, -1.0, 0.6) # thumb1 (-1.04rad(full open) to 0.61rad(full close))
+                    right_q_target[2] = np.clip(-right_triger_value, -1.74, 0.0) # thumb2 (-1.74rad(full open) to 0rad(full close))
+                    right_q_target[3] = np.clip(right_squeeze_value, 0.0, 0.98) # middle0 (pinky0) OK
+                    right_q_target[4] = np.clip(right_squeeze_value, 0.0, 0.98) # middle1 (pinky1) OK
+                    right_q_target[5] = np.clip(right_triger_value, 0.0, 0.98) # index0 (point0) OK
+                    right_q_target[6] = np.clip(right_triger_value, 0.0, 0.98) # index1 (point1) OK
 
                 # get dual hand action
                 action_data = np.concatenate((left_q_target, right_q_target))    
