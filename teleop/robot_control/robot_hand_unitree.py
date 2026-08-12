@@ -213,8 +213,9 @@ class Dex3_1_Controller:
 # TODO: Controller was copied from Dex3_1_Controller class. Adaptation to XR/VR controllers is needed
 # Dex3-1 controller to work with XR/VR controllers
 class Dex3_1_Controller_ctrl:
-    def __init__(self, left_hand_array_in, right_hand_array_in, dual_hand_data_lock = None, dual_hand_state_array_out = None,
-                           dual_hand_action_array_out = None, fps = 100.0, Unit_Test = False, simulation_mode = False, xr_motion_data_ready_in = None):
+    def __init__(self, left_gripper_trigger_in, left_gripper_squeeze_in, right_gripper_trigger_in, right_gripper_squeeze_in, 
+                 dual_hand_data_lock = None, dual_hand_state_array_out = None, dual_hand_action_array_out = None, 
+                 fps = 100.0, Unit_Test = False, simulation_mode = False, xr_motion_data_ready_in = None):
             """
             This class is for controling Unitree Dex3-1 end-effectors using XR/VR controllers
 
@@ -270,15 +271,16 @@ class Dex3_1_Controller_ctrl:
                 if any(self.left_hand_state_array) and any(self.right_hand_state_array):
                     break
                 time.sleep(0.01)
-                logger_mp.warning("[Dex3_1_Controller] Waiting to subscribe dds...")
-            logger_mp.info("[Dex3_1_Controller] Subscribe dds ok.")
+                logger_mp.warning("[Dex3_1_Controller_ctrl] Waiting to subscribe dds...")
+            logger_mp.info("[Dex3_1_Controller_ctrl] Subscribe dds ok.")
     
-            hand_control_process = Process(target=self.control_process, args=(left_hand_array_in, right_hand_array_in,  self.left_hand_state_array, self.right_hand_state_array,
-                                                                              dual_hand_data_lock, dual_hand_state_array_out, dual_hand_action_array_out, xr_motion_data_ready_in))
+            hand_control_process = Process(target=self.control_process, args=(left_gripper_trigger_in, left_gripper_squeeze_in, right_gripper_trigger_in, right_gripper_squeeze_in, 
+                                                                              self.left_hand_state_array, self.right_hand_state_array, dual_hand_data_lock, 
+                                                                              dual_hand_state_array_out, dual_hand_action_array_out, xr_motion_data_ready_in))
             hand_control_process.daemon = True
             hand_control_process.start()
     
-            logger_mp.info("Initialize Dex3_1_Controller OK!")
+            logger_mp.info("Initialize Dex3_1_Controller_ctrl OK!")
     
     def _subscribe_hand_state(self):
         while True:
@@ -315,15 +317,14 @@ class Dex3_1_Controller_ctrl:
 
         self.LeftHandCmb_publisher.Write(self.left_msg)
         self.RightHandCmb_publisher.Write(self.right_msg)
-        # logger_mp.debug("hand ctrl publish ok.")
         
     def control_process(self, left_gripper_trigger_in, left_gripper_squeeze_in, right_gripper_trigger_in, right_gripper_squeeze_in, 
                         left_hand_state_array, right_hand_state_array, dual_hand_data_lock = None, dual_hand_state_array_out = None, dual_hand_action_array_out = None, 
                         xr_motion_data_ready_in = None):
         self.running = True
 
-        left_q_target  = np.full(Dex3_Num_Motors, 0)
-        right_q_target = np.full(Dex3_Num_Motors, 0)
+        left_q_target = [0 for _ in range(Dex3_Num_Motors)]
+        right_q_target = [0 for _ in range(Dex3_Num_Motors)]
 
         q = 0.0
         dq = 0.0
@@ -380,11 +381,24 @@ class Dex3_1_Controller_ctrl:
 
                 # TODO: change calculation of target finger positions
                 if xr_motion_data_ready:
-                    ref_left_value = left_hand_data[self.hand_retargeting.left_indices[1,:]] - left_hand_data[self.hand_retargeting.left_indices[0,:]]
-                    ref_right_value = right_hand_data[self.hand_retargeting.right_indices[1,:]] - right_hand_data[self.hand_retargeting.right_indices[0,:]]
+                    # In the official document, the angles are in the range [0, 1] ==> 0.0: fully open  1.0: fully closed
+                    left_triger_value = (10.0 - left_trigger_value) / 10.0
+                    left_q_target[0] = np.clip((left_triger_value - 0.5) / 0.5, a_min=0.0, a_max=0.98) # thumb-aux
+                    left_q_target[1] = np.clip(left_triger_value / 0.5, 0.0, 0.7) # thumb
+                    left_q_target[2] = np.clip(left_triger_value, 0.0, 0.98)                   # index
+                    left_q_target[3] = np.clip(left_squeeze_value, 0.0, 0.98)   # middle
+                    left_q_target[4] = np.clip(left_squeeze_value, 0.0, 0.98)   # ring
+                    left_q_target[5] = np.clip(left_triger_value, 0.0, 0.98)   # pinky
+                    left_q_target[6] = np.clip(left_triger_value, 0.0, 0.98)
 
-                    left_q_target  = self.hand_retargeting.left_retargeting.retarget(ref_left_value)[self.hand_retargeting.left_dex_retargeting_to_hardware]
-                    right_q_target = self.hand_retargeting.right_retargeting.retarget(ref_right_value)[self.hand_retargeting.right_dex_retargeting_to_hardware]
+                    right_triger_value = (10.0 - right_trigger_value) / 10.0
+                    right_q_target[0] = np.clip((right_triger_value - 0.5) / 0.5, 0.0, 0.98)
+                    right_q_target[1] = np.clip(right_triger_value / 0.5, 0.0, 0.7)
+                    right_q_target[2] = np.clip(right_squeeze_value, 0.0, 0.98)                  # index
+                    right_q_target[3] = np.clip(right_triger_value, 0.0, 0.98)  # middle
+                    right_q_target[4] = np.clip(right_triger_value, 0.0, 0.98)  # ring
+                    right_q_target[5] = np.clip(right_squeeze_value, 0.0, 0.98)  # pinky
+                    right_q_target[6] = np.clip(right_squeeze_value, 0.0, 0.98)
 
                 # get dual hand action
                 action_data = np.concatenate((left_q_target, right_q_target))    
@@ -600,34 +614,58 @@ class Gripper_JointIndex(IntEnum):
 if __name__ == "__main__":
     import argparse
     from televuer import TeleVuerWrapper
-    from teleimager import ImageClient
+    from teleimager.image_client import ImageClient
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--xr-mode', type=str, choices=['hand', 'controller'], default='hand', help='Select XR device tracking source')
+    parser.add_argument('--input-mode', type=str, choices=['hand', 'controller'], default='hand', help='Select XR device tracking source')
     parser.add_argument('--ee', type=str, choices=['dex1', 'dex3', 'inspire1', 'brainco'], help='Select end effector controller')
+    parser.add_argument('--display-mode', type=str, choices=['immersive', 'ego', 'pass-through'], default='immersive', help='Select XR device display mode')
+    parser.add_argument('--img-server-ip', type=str, default='192.168.123.164', help='IP address of image server, used by teleimager and televuer')
+    parser.add_argument('--network-interface', type=str, default=None, help='Network interface for dds communication, e.g., eth0, wlan0. If None, use default interface.')
     args = parser.parse_args()
     logger_mp.info(f"args:{args}\n")
 
-    ChannelFactoryInitialize(1) # 0 for real robot, 1 for simulation
+    ChannelFactoryInitialize(0, networkInterface=args.network_interface) # 0 for real robot, 1 for simulation
     
     # image client
-    img_client = ImageClient(host='127.0.0.1') #host='192.168.123.164'
-    if not img_client.has_head_cam():
-        logger_mp.error("Head camera is required. Please enable head camera on the image server side.")
-    head_img_shape = img_client.get_head_shape()
-    tv_binocular = img_client.head_is_binocular()
+    img_client = ImageClient(host='192.168.123.164') #host='192.168.123.164'
+    camera_config = img_client.get_cam_config()
+    xr_need_local_img = not (args.display_mode == 'pass-through' or camera_config['head_camera']['enable_webrtc'])
 
-    # television: obtain hand pose data from the XR device and transmit the robot's head camera image to the XR device.
-    tv_wrapper = TeleVuerWrapper(binocular=tv_binocular, use_hand_tracking=args.xr_mode == "hand", img_shape=head_img_shape, return_hand_rot_data = False)
+    tv_wrapper = TeleVuerWrapper(use_hand_tracking=args.input_mode == "hand", 
+                                         binocular=camera_config['head_camera']['binocular'],
+                                         img_shape=camera_config['head_camera']['image_shape'],
+                                         # maybe should decrease fps for better performance?
+                                         # https://github.com/unitreerobotics/xr_teleoperate/issues/172
+                                         # display_fps=camera_config['head_camera']['fps'] ? args.frequency? 30.0?
+                                         display_mode=args.display_mode,
+                                         zmq=camera_config['head_camera']['enable_zmq'],
+                                         webrtc=camera_config['head_camera']['enable_webrtc'],
+                                         webrtc_url=f"https://{args.img_server_ip}:{camera_config['head_camera']['webrtc_port']}/offer",
+                                         arm_reference_mode="head_yaw"
+                                         )
 
 # end-effector
-    if args.ee == "dex3":
+    if args.ee == "dex3" and args.input_mode == "hand":
         left_hand_pos_array = Array('d', 75, lock = True)      # [input]
         right_hand_pos_array = Array('d', 75, lock = True)     # [input]
         dual_hand_data_lock = Lock()
         dual_hand_state_array = Array('d', 14, lock = False)   # [output] current left, right hand state(14) data.
         dual_hand_action_array = Array('d', 14, lock = False)  # [output] current left, right hand action(14) data.
         hand_ctrl = Dex3_1_Controller(left_hand_pos_array, right_hand_pos_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array)
+
+    # Added condition for Dex3-1 with controllers
+    elif args.ee == "dex3" and args.input_mode == "controller":
+        left_gripper_trigger_in = Value('d', 0.0, lock=True)
+        left_gripper_squeeze_in = Value('d', 0.0, lock=True)
+        right_gripper_trigger_in = Value('d', 0.0, lock=True)
+        right_gripper_squeeze_in = Value('d', 0.0, lock=True)
+        dual_hand_data_lock = Lock()
+        dual_hand_state_array = Array('d', 14, lock = False)   # [output] current left, right hand state(14) data.
+        dual_hand_action_array = Array('d', 14, lock = False)  # [output] current left, right hand action(14) data.
+        hand_ctrl = Dex3_1_Controller_ctrl(left_gripper_trigger_in, left_gripper_squeeze_in, right_gripper_trigger_in, right_gripper_squeeze_in, 
+                                           dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array)
+        
     elif args.ee == "dex1":
         left_gripper_value = Value('d', 0.0, lock=True)        # [input]
         right_gripper_value = Value('d', 0.0, lock=True)       # [input]
@@ -639,20 +677,36 @@ if __name__ == "__main__":
     user_input = input("Please enter the start signal (enter 's' to start the subsequent program):\n")
     if user_input.lower() == 's':
         while True:
-            head_img, head_img_fps = img_client.get_head_frame()
-            tv_wrapper.set_display_image(head_img)
+            if camera_config['head_camera']['enable_zmq']:
+                if xr_need_local_img:
+                    head_img = img_client.get_head_frame()
+                if xr_need_local_img and head_img.bgr is not None:
+                    tv_wrapper.render_to_xr(head_img.bgr)
+
             tele_data = tv_wrapper.get_tele_data()
-            if args.ee == "dex3" and args.xr_mode == "hand":
+            if args.ee == "dex3" and args.input_mode == "hand":
                 with left_hand_pos_array.get_lock():
                     left_hand_pos_array[:] = tele_data.left_hand_pos.flatten()
                 with right_hand_pos_array.get_lock():
                     right_hand_pos_array[:] = tele_data.right_hand_pos.flatten()
-            elif args.ee == "dex1" and args.xr_mode == "controller":
+
+            # Added condition for Dex3-1 with controllers
+            elif args.ee == "dex3" and args.input_mode == "controller":
+                with left_gripper_trigger_in.get_lock():
+                    left_gripper_trigger_in.value = tele_data.left_ctrl_triggerValue # left_gripper_trigger_in.value
+                with left_gripper_squeeze_in.get_lock():
+                    left_gripper_squeeze_in.value = tele_data.left_ctrl_squeezeValue # left_gripper_squeeze_in.value
+                with right_gripper_trigger_in.get_lock():
+                    right_gripper_trigger_in.value = tele_data.right_ctrl_triggerValue # right_gripper_trigger_in.value
+                with right_gripper_squeeze_in.get_lock():
+                    right_gripper_squeeze_in.value = tele_data.right_ctrl_squeezeValue # right_gripper_squeeze_in.value
+
+            elif args.ee == "dex1" and args.input_mode == "controller":
                 with left_gripper_value.get_lock():
                     left_gripper_value.value = tele_data.left_ctrl_triggerValue
                 with right_gripper_value.get_lock():
                     right_gripper_value.value = tele_data.right_ctrl_triggerValue
-            elif args.ee == "dex1" and args.xr_mode == "hand":
+            elif args.ee == "dex1" and args.input_mode == "hand":
                 with left_gripper_value.get_lock():
                     left_gripper_value.value = tele_data.left_hand_pinchValue
                 with right_gripper_value.get_lock():
