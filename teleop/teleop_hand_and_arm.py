@@ -190,9 +190,9 @@ if __name__ == '__main__':
 
         # This condition makes program to stop working with Unitree Dex3-1, Inspire FTP/DFX hands
         # To make Dex3-1 hands work with controller it's needed to look how Dex1-1 works
-        if args.ee in ("dex3", "inspire_ftp", "inspire_dfx") and args.input_mode == "controller":
+        if args.ee in ("inspire_ftp", "inspire_dfx") and args.input_mode == "controller":
             raise ValueError(f"{args.ee} does not support controller input mode.")
-        elif args.ee == "dex3":
+        elif args.ee == "dex3" and args.input_mode == "hand":
             from teleop.robot_control.robot_hand_unitree import Dex3_1_Controller
             left_hand_pos_array = Array('d', 75, lock = True)      # [input]
             right_hand_pos_array = Array('d', 75, lock = True)     # [input]
@@ -201,6 +201,18 @@ if __name__ == '__main__':
             dual_hand_action_array = Array('d', 14, lock = False)  # [output] current left, right hand action(14) data.
             hand_ctrl = Dex3_1_Controller(left_hand_pos_array, right_hand_pos_array, dual_hand_data_lock, 
                                           dual_hand_state_array, dual_hand_action_array, simulation_mode=args.sim, xr_motion_data_ready_in=xr_motion_data_ready)
+
+        elif args.ee == "dex3" and args.input_mode == "controller":
+                from teleop.robot_control.robot_hand_unitree import Dex3_1_Controller_ctrl
+                left_gripper_trigger_in = Value('d', 0.0, lock=True)
+                left_gripper_squeeze_in = Value('d', 0.0, lock=True)
+                right_gripper_trigger_in = Value('d', 0.0, lock=True)
+                right_gripper_squeeze_in = Value('d', 0.0, lock=True)
+                dual_hand_data_lock = Lock()
+                dual_hand_state_array = Array('d', 14, lock = False)   # [output] current left, right hand state(14) data.
+                dual_hand_action_array = Array('d', 14, lock = False)  # [output] current left, right hand action(14) data.
+                hand_ctrl = Dex3_1_Controller_ctrl(left_gripper_trigger_in, left_gripper_squeeze_in, right_gripper_trigger_in, right_gripper_squeeze_in, 
+                                                   dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array)
 
         # Here is Dex1-1 activation algorithm
         elif args.ee == "dex1":
@@ -323,11 +335,29 @@ if __name__ == '__main__':
             tele_data = tv_wrapper.get_tele_data()
             # Heres's control of Dex and Inspire end-effectors using hands, but it can't work controllers
             # Let's fix it!
-            if args.ee in ("dex3", "inspire_ftp", "inspire_dfx", "brainco")  and args.input_mode == "hand":
+            # if args.ee in ("dex3", "inspire_ftp", "inspire_dfx", "brainco")  and args.input_mode == "hand":
+            #     with left_hand_pos_array.get_lock():
+            #         left_hand_pos_array[:] = tele_data.left_hand_pos.flatten()
+            #     with right_hand_pos_array.get_lock():
+            #         right_hand_pos_array[:] = tele_data.right_hand_pos.flatten()
+
+            # Here's updated condition for inspire and brainco hands without Dex3-1
+            if args.ee in ("inspire_ftp", "inspire_dfx", "brainco")  and args.input_mode == "hand":
                 with left_hand_pos_array.get_lock():
                     left_hand_pos_array[:] = tele_data.left_hand_pos.flatten()
                 with right_hand_pos_array.get_lock():
                     right_hand_pos_array[:] = tele_data.right_hand_pos.flatten()
+            # And here's a condition with Dex3-1
+            elif args.ee == "dex3" and args.input_mode == "controller":
+                # It's needed to use controller triggers instead of hands positions
+                with left_gripper_trigger_in.get_lock():
+                    left_gripper_trigger_in.value = tele_data.left_ctrl_triggerValue
+                with left_gripper_squeeze_in.get_lock():
+                    left_gripper_squeeze_in.value = tele_data.left_ctrl_squeezeValue
+                with right_gripper_trigger_in.get_lock():
+                    right_gripper_trigger_in.value = tele_data.right_ctrl_triggerValue
+                with right_gripper_squeeze_in.get_lock():
+                    right_gripper_squeeze_in.value = tele_data.right_ctrl_squeezeValue      
             elif args.ee == "brainco" and args.input_mode == "controller":
                 with left_gripper_trigger_in.get_lock():
                     left_gripper_trigger_in.value = tele_data.left_ctrl_triggerValue
